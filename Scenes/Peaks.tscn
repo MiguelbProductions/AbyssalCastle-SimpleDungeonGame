@@ -1,0 +1,48 @@
+[gd_scene load_steps=7 format=3 uid="uid://clouvvli6wdj5"]
+
+[ext_resource type="Texture2D" uid="uid://bbibsbecpsi8d" path="res://Assets/Items/peaks/peaks_3.png" id="1_ksjhg"]
+[ext_resource type="Texture2D" uid="uid://dreshi7gn8gm2" path="res://Assets/Items/peaks/peaks_4.png" id="2_pcjcn"]
+[ext_resource type="Texture2D" uid="uid://t18tqxb141rx" path="res://Assets/Items/peaks/peaks_2.png" id="3_8wwmi"]
+[ext_resource type="Texture2D" uid="uid://xfpx501xikyp" path="res://Assets/Items/peaks/peaks_1.png" id="4_0a3my"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_q1siu"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_ksjhg")
+}, {
+"duration": 1.0,
+"texture": ExtResource("2_pcjcn")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_8wwmi")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_0a3my")
+}],
+"loop": true,
+"name": &"Attack",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_ksjhg")
+}],
+"loop": true,
+"name": &"Default",
+"speed": 5.0
+}]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hve6q"]
+size = Vector2(16, 16)
+
+[node name="Peaks" type="StaticBody2D"]
+
+[node name="Spr_Peaks" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_q1siu")
+animation = &"Default"
+autoplay = "Attack"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_hve6q")
+disabled = true

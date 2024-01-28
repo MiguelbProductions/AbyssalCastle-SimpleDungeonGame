@@ -1,0 +1,86 @@
+[gd_scene load_steps=9 format=3 uid="uid://bkrmd3bgycwoc"]
+
+[ext_resource type="Texture2D" uid="uid://rjwxq4q3nad5" path="res://Assets/Character/Priests_Idle/Priest_Idle1.png" id="1_fc1tb"]
+[ext_resource type="Texture2D" uid="uid://b4hcwhi7r7mxv" path="res://Assets/Character/Priests_Idle/Priest_Idle2.png" id="2_f0lxm"]
+[ext_resource type="Texture2D" uid="uid://dwj5srediyc8u" path="res://Assets/Character/Priests_Idle/Priest_Idle3.png" id="3_l4k02"]
+[ext_resource type="Texture2D" uid="uid://7xhtiad2fjp" path="res://Assets/Character/Priests_Idle/Priest_Idle4.png" id="4_i1iiv"]
+[ext_resource type="Texture2D" uid="uid://h3wj5pnneb7" path="res://Assets/Character/Priests_Walk/Priest_Walk1.png" id="5_4wqu7"]
+
+[sub_resource type="GDScript" id="GDScript_vfh5p"]
+script/source = "extends CharacterBody2D
+
+@onready var Spr_Player = $Spr_Player
+
+const SPEED = 200.0
+
+func Move():
+	var direction = Vector2(Input.get_axis(\"Left\", \"Right\"), Input.get_axis(\"Up\", \"Down\"))
+	
+	if direction:
+		velocity = (direction).normalized() * SPEED
+	else:
+		velocity.x = move_toward(velocity.x, 0, SPEED)
+		velocity.y = move_toward(velocity.y, 0, SPEED)
+	
+	move_and_slide()
+
+func Animate():
+	if (velocity != Vector2.ZERO):
+		if (velocity.x > 0): Spr_Player.flip_h = false
+		else: Spr_Player.flip_h = true
+		
+		Spr_Player.play(\"Walk\")
+	else:
+		Spr_Player.play(\"Idle\")
+
+func _physics_process(delta):
+	Move()
+	Animate()
+"
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_hsffw"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("1_fc1tb")
+}, {
+"duration": 1.0,
+"texture": ExtResource("2_f0lxm")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_l4k02")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_i1iiv")
+}],
+"loop": true,
+"name": &"Idle",
+"speed": 3.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("5_4wqu7")
+}],
+"loop": true,
+"name": &"Walk",
+"speed": 5.0
+}]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_25nvn"]
+radius = 5.0
+height = 10.0
+
+[node name="Player" type="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 13
+script = SubResource("GDScript_vfh5p")
+
+[node name="Spr_Player" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_hsffw")
+animation = &"Idle"
+
+[node name="Collision_Player" type="CollisionShape2D" parent="."]
+position = Vector2(-1, 2)
+shape = SubResource("CapsuleShape2D_25nvn")
+
+[node name="Camera" type="Camera2D" parent="."]
