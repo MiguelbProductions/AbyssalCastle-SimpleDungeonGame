@@ -1,0 +1,52 @@
+[gd_scene load_steps=2 format=3 uid="uid://d4a26h5cfmxlm"]
+
+[sub_resource type="GDScript" id="GDScript_qamyj"]
+script/source = "extends Node2D
+
+var PeaksListByTime = {
+	0: [],
+	1: [],
+	2: [],
+	3: [],
+	4: [],
+	5: [],
+	6: [],
+	7: [],
+	8: [],
+	9: [],
+	10: []
+}
+
+var Max_Range = 1
+
+var AttackSequence_StartTime = 0
+var AttackSequence_NextTime = 0
+
+var CurrentPosPeaks = 0
+var Working = true
+
+func Start():
+	if (!Working): 
+		Working = true
+		
+		AttackSequence_StartTime = Time.get_ticks_msec()
+		AttackSequence_NextTime = Time.get_ticks_msec() + 1000
+
+func _process(_delta):
+	if (Working):
+		if (Time.get_ticks_msec() >= AttackSequence_NextTime):
+			CurrentPosPeaks += 1
+			AttackSequence_NextTime = AttackSequence_NextTime + 1000
+			
+			for spike in PeaksListByTime[CurrentPosPeaks]:
+				spike.Attack() 
+				
+			if (Max_Range == CurrentPosPeaks):
+				AttackSequence_StartTime = Time.get_ticks_msec()
+				AttackSequence_NextTime = AttackSequence_StartTime + 1000
+				
+				CurrentPosPeaks = 0
+"
+
+[node name="PeaksFolder" type="Node2D"]
+script = SubResource("GDScript_qamyj")

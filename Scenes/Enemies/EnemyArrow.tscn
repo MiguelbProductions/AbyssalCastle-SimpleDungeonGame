@@ -1,0 +1,136 @@
+[gd_scene load_steps=13 format=3 uid="uid://b600vkadbadbe"]
+
+[ext_resource type="Texture2D" uid="uid://doqer5we2k3vb" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Arrow.png" id="1_uobhu"]
+[ext_resource type="Texture2D" uid="uid://cpyy2djy2h2c2" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Arrow_FadeOut/Arrow_FadeOut1.png" id="2_nld48"]
+[ext_resource type="Texture2D" uid="uid://dpgoltlsogk7h" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Arrow_FadeOut/Arrow_FadeOut2.png" id="3_ns2qb"]
+[ext_resource type="Texture2D" uid="uid://db82uyjmgovi2" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Arrow_FadeOut/Arrow_FadeOut3.png" id="4_mt73p"]
+[ext_resource type="Texture2D" uid="uid://ml45q08rn302" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Arrow_FadeOut/Arrow_FadeOut4.png" id="5_h746o"]
+[ext_resource type="Texture2D" uid="uid://du0awoju6xd1w" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Arrow_FadeOut/Arrow_FadeOut5.png" id="6_eavp5"]
+[ext_resource type="Texture2D" uid="uid://3rv2cyef8d8d" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Arrow_FadeOut/Arrow_FadeOut6.png" id="7_aidoj"]
+
+[sub_resource type="GDScript" id="GDScript_itl11"]
+script/source = "extends CharacterBody2D
+
+@onready var Animation_Arrow = $Animation_Arrow
+
+const ARROW_DAMAGE = 1
+
+var speed = 200
+var direction = Vector2()
+
+var DurationTime = 3.0
+var EndTime = 0
+
+var Hited = false
+
+func _ready():
+	rotation = direction.angle()
+	
+	EndTime = Time.get_ticks_msec() + DurationTime * 1000
+
+func Hit_Target(body):
+	if ((body.is_in_group(\"Player\") or body.get_name() == \"Map\") and !Hited): 
+		Hited = true
+		Animation_Arrow.play(\"FadeOut\")
+		
+		if (body.is_in_group(\"Player\") and !body.TakingDamage): body.Hit(ARROW_DAMAGE)
+		
+		await Animation_Arrow.animation_finished
+		queue_free()
+
+func _physics_process(_delta):
+	if (Hited or Time.get_ticks_msec() >= EndTime): velocity = direction * (speed / 1.5)
+	else: velocity = direction * speed
+	
+	move_and_slide()
+"
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_kc8jv"]
+size = Vector2(7, 3)
+
+[sub_resource type="Animation" id="Animation_yrvug"]
+resource_name = "FadeOut"
+length = 0.5
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Spr_Arrow:texture")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.2, 0.3, 0.4, 0.5),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [ExtResource("2_nld48"), ExtResource("3_ns2qb"), ExtResource("4_mt73p"), ExtResource("5_h746o"), ExtResource("6_eavp5"), ExtResource("7_aidoj")]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Spr_Arrow:modulate")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Color(1, 1, 1, 1), Color(1, 1, 1, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_8hj3c"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Spr_Arrow:texture")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [ExtResource("1_uobhu")]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Spr_Arrow:modulate")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(1, 1, 1, 1)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_4sic4"]
+_data = {
+"FadeOut": SubResource("Animation_yrvug"),
+"RESET": SubResource("Animation_8hj3c")
+}
+
+[node name="EnemyArrow" type="CharacterBody2D"]
+script = SubResource("GDScript_itl11")
+
+[node name="Spr_Arrow" type="Sprite2D" parent="."]
+texture = ExtResource("1_uobhu")
+
+[node name="Collision_Arrow" type="CollisionShape2D" parent="."]
+position = Vector2(-0.5, 0.5)
+shape = SubResource("RectangleShape2D_kc8jv")
+disabled = true
+
+[node name="PlayerDetectArea" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 2
+
+[node name="AreaofDetection" type="CollisionShape2D" parent="PlayerDetectArea"]
+position = Vector2(-0.5, 0.5)
+shape = SubResource("RectangleShape2D_kc8jv")
+
+[node name="Animation_Arrow" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_4sic4")
+}
+
+[connection signal="body_exited" from="PlayerDetectArea" to="." method="Hit_Target"]

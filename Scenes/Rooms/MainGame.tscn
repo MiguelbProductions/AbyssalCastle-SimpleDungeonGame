@@ -1,0 +1,550 @@
+[gd_scene load_steps=8 format=3 uid="uid://ltohu3eso8ys"]
+
+[ext_resource type="TileSet" uid="uid://c1dhkcrxk4xi0" path="res://PresetElement/Map_Tileset.tres" id="1_nhfjb"]
+[ext_resource type="TileSet" uid="uid://b8rlb5miqv60e" path="res://PresetElement/PeaksOrder_Tileset.tres" id="2_flcyn"]
+[ext_resource type="Texture2D" uid="uid://cp20mp82ca7iv" path="res://Assets/Tileset/DoorsOld.png" id="3_ewluf"]
+[ext_resource type="PackedScene" uid="uid://bkrmd3bgycwoc" path="res://Scenes/Player/Player.tscn" id="4_i4s86"]
+
+[sub_resource type="GDScript" id="GDScript_suuod"]
+script/source = "extends Node2D
+
+class Room:
+	var rect: Rect2
+	var tunnels = []
+	var enemies_count = 0
+	var RoomBattleType = 1
+	var RoomType = \"\"
+
+	func _init(_x, _y, _width, _height):
+		rect = Rect2(_x, _y, _width, _height)
+
+@onready var Player = $Entities/Player
+
+@onready var Objects = $Objects
+@onready var Entities = $Entities
+
+@onready var Map_TileMap = $Map
+@onready var Doors_TileMap = $Doors
+@onready var PeaksOrder_Tilemap = $PeaksOrder
+
+@onready var GUI_Animation = $Entities/Player/GUI/GUI_Animation
+
+@onready var MapBox = $Entities/Player/GUI/MapBox/Background
+
+const MAX_SHOPROOM_BY_FLOOR = 1
+const MAX_SPECIALROOM_BY_FLOOR = 0
+
+const MINIMAP_SCALE = 0.06
+const MINIMAP_PADDING = 2 
+
+var NumofShopRooms = 0
+var NumofSpecialRooms = 0
+
+var GoblinArcherScene = preload(\"res://Scenes/Enemies/GoblinArcher.tscn\")
+var TinySlimeScene = preload(\"res://Scenes/Enemies/TinySlime.tscn\")
+
+var LaddersScene = preload(\"res://Scenes/Objects/Ladders.tscn\")
+var PeaksScene = preload(\"res://Scenes/Objects/Peaks.tscn\")
+
+var PeaksFolder = preload(\"res://Scenes/Objects/PeaksFolder.tscn\")
+
+var CurrentRoom
+var Rooms = []
+
+var Total_RoomsGenerated = 0
+var Max_Rooms = 7
+var Min_Rooms = 4
+
+var Room_Size = Vector2(19, 19) * 16
+
+var Tunnel_Length = 6 * 16
+var Tunnel_Width = 6 * 16
+var Tunnel_Thickness = 5
+
+var player_marker: ColorRect
+var player_start_position
+
+var Object_By_AtlasCords = {
+	Vector2i(2, 10): preload(\"res://Scenes/Objects/CandleStick.tscn\"),
+	Vector2i(5, 8): preload(\"res://Scenes/Objects/ShopBox.tscn\")
+}
+
+func _ready():
+	GUI_Animation.play(\"FadeIn\")
+	
+	randomize()
+	generate_dungeon()
+	generate_minimap()
+	
+	await GUI_Animation.animation_finished
+	
+	PlayerManager.ChangingScenes = false
+
+func On_EnemieDefeated(room):
+	room.enemies_count -= 1
+	
+	if room.enemies_count == 0: 
+		unlock_room_gates(room)
+		
+		if (are_all_rooms_clear()): 
+			var Ladders = LaddersScene.instantiate()
+			var map_position = Map_TileMap.local_to_map(room.rect.position + room.rect.size / 2)
+			
+			Ladders.position = room.rect.position + room.rect.size / 2
+			
+			Map_TileMap.set_cell(1, map_position, -1)
+			
+			Objects.add_child(Ladders)
+
+func are_all_rooms_clear():
+	for room in Rooms:
+		if room.enemies_count > 0:
+			return false
+	return true
+
+func generate_dungeon():
+	var initial_room = Room.new(0, 0, Room_Size.x, Room_Size.y)
+	CurrentRoom = initial_room
+	Rooms.append(initial_room)
+	
+	Total_RoomsGenerated += 1
+	
+	player_start_position = initial_room.rect.position
+	Player.position = initial_room.rect.position + initial_room.rect.size / 2
+	
+	generate_tunnels(initial_room)
+	draw_dungeon()
+	place_spikes()
+	place_animatedobjects()
+	
+	for room in Rooms: generate_enemies(room)
+
+func generate_tunnels(room):
+	if Total_RoomsGenerated >= Max_Rooms: return
+	
+	var num_tunnels = randi() % 4 + 1
+	
+	for i in range(num_tunnels):
+		if Total_RoomsGenerated >= Max_Rooms:
+			break
+		
+		var tunnel_dir = Vector2.ZERO
+		var new_room_pos = room.rect.position
+		
+		match i:
+			0: tunnel_dir = Vector2(0, -1)
+			1: tunnel_dir = Vector2(1, 0)
+			2: tunnel_dir = Vector2(0, 1)
+			3: tunnel_dir = Vector2(-1, 0)
+		
+		new_room_pos += tunnel_dir * (Room_Size + Vector2(Tunnel_Length, Tunnel_Width))
+		
+		if is_position_occupied(new_room_pos): continue
+		
+		var new_room = Room.new(new_room_pos.x, new_room_pos.y, Room_Size.x, Room_Size.y)
+		var RoomChanceType = randi_range(0, 100)
+		
+		new_room.RoomBattleType = randi_range(2, 6)
+		new_room.RoomType = get_room_type_by_chance(RoomChanceType)
+		
+		var Room_AlreadyInList = false
+		
+		for RoomX in Rooms:
+			if (RoomX.rect.position == new_room.rect.position):
+				Room_AlreadyInList = true
+				break
+		
+		if (!Room_AlreadyInList):
+			if (new_room.RoomType == \"BattleRoom\"):
+				var RoomBattleType = Map_TileMap.tile_set.get_pattern(new_room.RoomBattleType)
+				Map_TileMap.set_pattern(1, Map_TileMap.local_to_map(new_room.rect.position + Vector2(16, 16)), RoomBattleType)
+				
+				var RoomBattleType_ColorPeaks = PeaksOrder_Tilemap.tile_set.get_pattern(new_room.RoomBattleType - 2)
+				if (RoomBattleType_ColorPeaks): PeaksOrder_Tilemap.set_pattern(0, PeaksOrder_Tilemap.local_to_map(new_room.rect.position + Vector2(16, 16)), RoomBattleType_ColorPeaks)
+			elif (new_room.RoomType == \"ShopRoom\"):
+				var RoomBattleType = Map_TileMap.tile_set.get_pattern(1)
+				
+				Map_TileMap.set_pattern(1, Map_TileMap.local_to_map(new_room.rect.position + Vector2(16, 16)), RoomBattleType)
+			
+			Total_RoomsGenerated += 1
+			
+			room.tunnels.append([room.rect.position + Room_Size * 0.5, new_room_pos + Room_Size * 0.5])
+			
+			Rooms.append(new_room)
+		
+		if Total_RoomsGenerated < Min_Rooms or randi() % 2 == 0:
+			generate_tunnels(new_room)
+
+func get_room_type_by_chance(chance):
+	MAX_SPECIALROOM_BY_FLOOR
+	
+	if (chance < 20): return \"BattleRoom\"
+	elif (chance < 95 and NumofShopRooms < MAX_SHOPROOM_BY_FLOOR):
+		NumofShopRooms += 1
+		return \"ShopRoom\"
+	elif (NumofSpecialRooms < MAX_SPECIALROOM_BY_FLOOR): 
+		NumofSpecialRooms += 1
+		return \"SpecialRoom\"
+	
+	return \"BattleRoom\"
+
+func generate_enemies(room):
+	if (room == Rooms[0] or room.RoomType != \"BattleRoom\"): return
+	
+	var num_enemies = randi() % 3 + 1 
+	var room_rect = room.rect
+	var margin = 48
+	
+	room.enemies_count += num_enemies
+	
+	var EnemiesList = [
+		GoblinArcherScene,
+		TinySlimeScene
+	]
+	
+	for i in range(num_enemies):
+		var EnemieX = EnemiesList[randi_range(0, EnemiesList.size() - 1)].instantiate()
+		var position_in_room = Vector2(
+			randi_range(room_rect.position.x + margin, room_rect.end.x - margin),
+			randi_range(room_rect.position.y + margin, room_rect.end.y - margin)
+		)
+		
+		EnemieX.current_room = room
+		EnemieX.position = position_in_room
+		EnemieX.enemie_defeated.connect(On_EnemieDefeated)
+		
+		Entities.add_child(EnemieX)
+
+func place_spikes():
+	var RoomPos = 0
+	for room in Rooms:
+		RoomPos += 1
+		
+		var start_x = int(room.rect.position.x / 16)
+		var start_y = int(room.rect.position.y / 16)
+		var end_x = start_x + int(room.rect.size.x / 16)
+		var end_y = start_y + int(room.rect.size.y / 16)
+		
+		var Room_PeaksFolder = PeaksFolder.instantiate()
+		
+		Room_PeaksFolder.name = \"PeaksFolder_Room\" + str(RoomPos)
+		
+		for x in range(start_x, end_x):
+			for y in range(start_y, end_y):
+				var tile = Map_TileMap.get_cell_atlas_coords(1, Vector2(x, y))
+				if tile == Vector2i(8,8): 
+					var CooldownTypePeak = PeaksOrder_Tilemap.get_cell_atlas_coords(0, Vector2(x, y))
+					
+					if (CooldownTypePeak == Vector2i(-1, -1)): CooldownTypePeak = Vector2i(0, 0)
+					elif (CooldownTypePeak.x > Room_PeaksFolder.Max_Range): Room_PeaksFolder.Max_Range = CooldownTypePeak.x
+					
+					var spikes_instance = PeaksScene.instantiate()
+					
+					spikes_instance.position = Map_TileMap.map_to_local(Vector2(x, y))
+					
+					Room_PeaksFolder.PeaksListByTime[CooldownTypePeak.x].append(spikes_instance)
+					Room_PeaksFolder.add_child(spikes_instance) 
+		
+		Objects.add_child(Room_PeaksFolder)
+		Room_PeaksFolder.Start()
+
+func place_animatedobjects():
+	for room in Rooms:
+		var start_x = int(room.rect.position.x / 16)
+		var start_y = int(room.rect.position.y / 16)
+		var end_x = start_x + int(room.rect.size.x / 16)
+		var end_y = start_y + int(room.rect.size.y / 16)
+		
+		for x in range(start_x, end_x):
+			for y in range(start_y, end_y):
+				var tile = Map_TileMap.get_cell_atlas_coords(1, Vector2(x, y))
+				
+				for PossibleObject_AtlasCords in Object_By_AtlasCords.keys():
+					if (tile == PossibleObject_AtlasCords):
+						Map_TileMap.set_cell(1, Vector2(x, y), 0)
+						
+						var AnimatedObject = Object_By_AtlasCords[tile].instantiate()
+						
+						AnimatedObject.position = Map_TileMap.map_to_local(Vector2(x, y))
+						
+						Objects.add_child(AnimatedObject)
+						
+						break
+
+func is_position_occupied(positionX):
+	for existing_room in Rooms:
+		if existing_room.rect.encloses(Rect2(positionX, Room_Size)):
+			return true
+		return false
+
+func draw_dungeon():
+	var cell_size = Vector2(16,16)
+
+	for room in Rooms:
+		var start_x = int(room.rect.position.x / cell_size.x)
+		var start_y = int(room.rect.position.y / cell_size.y)
+		var end_x = start_x + int(room.rect.size.x / cell_size.x)
+		var end_y = start_y + int(room.rect.size.y / cell_size.y)
+		
+		var AllPos_Tiles = []
+		
+		for x in range(start_x, end_x):
+			for y in range(start_y, end_y):
+				AllPos_Tiles.append(Vector2i(x, y))
+		
+		Map_TileMap.set_cells_terrain_connect(0, AllPos_Tiles, 0, 0)
+		
+		AllPos_Tiles = []
+		
+		for tunnel in room.tunnels:
+			var start_pos = Map_TileMap.local_to_map(tunnel[0])
+			var end_pos = Map_TileMap.local_to_map(tunnel[1])
+			var line = get_line_points(start_pos, end_pos)
+			
+			for point in line:
+				AllPos_Tiles.append(Vector2i(point.x, point.y))
+		
+		Map_TileMap.set_cells_terrain_connect(0, AllPos_Tiles, 0, 0)
+
+func get_line_points(start, end):
+	var points = []
+	var diff = end - start
+	var steps = max(abs(diff.x), abs(diff.y))
+	var perp = Vector2(-diff.y, diff.x).normalized()
+
+	for i in range(steps + 1):
+		var t = float(i) / steps
+		var x = round(lerp(start.x, end.x, t))
+		var y = round(lerp(start.y, end.y, t))
+		var center_point = Vector2i(x, y)
+		
+		for w in range(-floor((Tunnel_Thickness - 1) / 2.0), floor((Tunnel_Thickness - 1) / 2.0) + 1):
+			var offset = perp * w
+			var offset_int = Vector2i(round(offset.x), round(offset.y))
+			
+			points.append(center_point + offset_int)
+	
+	return points
+
+func LockCurrentRoom():
+	if (CurrentRoom.enemies_count == 0): return
+	
+	var CenterOfRoom = CurrentRoom.rect.position + CurrentRoom.rect.size / 2
+		
+	for EdgeX in range(-1, 2):
+		for EdgeY in range(-1, 2):
+			if (EdgeX == EdgeY or (EdgeX != 0 and EdgeY != 0)): continue
+			
+			var DoorEdgePos = Vector2(CurrentRoom.rect.size.x / 2 * EdgeX, CurrentRoom.rect.size.y / 2 * EdgeY)
+			var InBorderPos = Vector2(16 * EdgeY, 16 * EdgeX)
+			
+			if (EdgeX == 1): InBorderPos.x += -16
+			if (EdgeY == 1): InBorderPos.y += -16
+			
+			var Door_Pos = CenterOfRoom + DoorEdgePos + InBorderPos
+			
+			var AtlasCord = Map_TileMap.get_cell_atlas_coords(0, Map_TileMap.local_to_map(Door_Pos))
+			if (AtlasCord.x < 6 or AtlasCord.y > 2): continue 
+			
+			for Door_Num in range(-1, Tunnel_Thickness - 3):
+				DoorEdgePos = Vector2(CurrentRoom.rect.size.x / 2 * EdgeX, CurrentRoom.rect.size.y / 2 * EdgeY)
+				var Pos_By_DoorNum = Vector2(Door_Num * 16 * EdgeY, Door_Num * 16 * EdgeX)
+				
+				InBorderPos = Vector2.ZERO
+				
+				if (EdgeX == 1): InBorderPos.x = -16
+				if (EdgeY == 1): InBorderPos.y = -16
+				
+				Door_Pos = CenterOfRoom + DoorEdgePos + Pos_By_DoorNum + InBorderPos
+				
+				var AtlasCordY
+				
+				if (EdgeY != 0): AtlasCordY = 0
+				else:
+					if (EdgeX == 1): AtlasCordY = 1
+					elif (EdgeX == -1): AtlasCordY = 2
+				
+				Doors_TileMap.set_cell(0, Doors_TileMap.local_to_map(Door_Pos), 0, Vector2(2 - Door_Num - 1, AtlasCordY))
+
+func unlock_room_gates(room):
+	var CenterOfRoom = room.rect.position + room.rect.size / 2
+	
+	for EdgeX in range(-1, 2):
+		for EdgeY in range(-1, 2):
+			if (EdgeX == EdgeY or (EdgeX != 0 and EdgeY != 0)): continue
+			
+			var DoorEdgePos = Vector2(CurrentRoom.rect.size.x / 2 * EdgeX, CurrentRoom.rect.size.y / 2 * EdgeY)
+			var InBorderPos = Vector2(16 * EdgeY, 16 * EdgeX)
+			
+			if (EdgeX == 1): InBorderPos.x += -16
+			if (EdgeY == 1): InBorderPos.y += -16
+			
+			var Door_Pos = CenterOfRoom + DoorEdgePos + InBorderPos
+			
+			if (Doors_TileMap.get_cell_atlas_coords(0, Doors_TileMap.local_to_map(Door_Pos)) == Vector2i(-1, -1)): continue 
+			
+			for Door_Num in range(-1, Tunnel_Thickness - 3):
+				DoorEdgePos = Vector2(room.rect.size.x / 2 * EdgeX, room.rect.size.y / 2 * EdgeY)
+				var Pos_By_DoorNum = Vector2(Door_Num * 16 * EdgeY, Door_Num * 16 * EdgeX)
+				InBorderPos = Vector2.ZERO
+				
+				if (EdgeX == 1): InBorderPos.x = -16
+				if (EdgeY == 1): InBorderPos.y = -16
+				
+				Door_Pos = CenterOfRoom + DoorEdgePos + Pos_By_DoorNum + InBorderPos
+				Doors_TileMap.set_cell(0, Doors_TileMap.local_to_map(Door_Pos), -1)
+
+func generate_minimap():
+	var minimap = MapBox
+	var minimap_center = minimap.size / 2
+	
+	var min_x = INF
+	var min_y = INF
+	var max_x = -INF
+	var max_y = -INF
+	
+	for room in Rooms:
+		min_x = min(min_x, room.rect.position.x)
+		min_y = min(min_y, room.rect.position.y)
+		max_x = max(max_x, room.rect.end.x)
+		max_y = max(max_y, room.rect.end.y)
+	
+	for room in Rooms:
+		var room_minimap = ColorRect.new()
+		
+		room_minimap.color = get_room_color(room)
+		room_minimap.size = room.rect.size * MINIMAP_SCALE
+		room_minimap.position = (room.rect.position - player_start_position) * MINIMAP_SCALE + minimap_center
+		
+		minimap.add_child(room_minimap)
+	
+	player_marker = ColorRect.new()
+	
+	player_marker.color = Color(0, 1, 0)  
+	player_marker.size = Vector2(8, 8)  
+	
+	MapBox.add_child(player_marker)
+
+func update_minimap_position():
+	if (CurrentRoom):
+		var minimap_center = MapBox.size / 2 + Vector2(0, MapBox.size.y / 4)
+		var room_center = (CurrentRoom.rect.position / 2 + CurrentRoom.rect.size / 2) * MINIMAP_SCALE
+		
+		
+		var minimap_offset = minimap_center - room_center
+		
+		for child in MapBox.get_children():
+			if child is ColorRect and child != player_marker:
+				var room_position = (Rooms[child.get_index()].rect.position - player_start_position) * MINIMAP_SCALE
+				child.position = room_position + minimap_offset
+		
+		var player_position_relative_to_room = (Player.position - CurrentRoom.rect.position) * MINIMAP_SCALE
+		var player_marker_position = (CurrentRoom.rect.position - player_start_position) * MINIMAP_SCALE + player_position_relative_to_room + minimap_offset
+		
+		player_marker.position = player_marker_position - player_marker.size/2
+
+func get_room_color(room):
+	match room.RoomType:
+		\"BattleRoom\": return Color(1, 0, 0)  
+		\"ShopRoom\": return Color(0, 1, 0)    
+		\"SpecialRoom\": return Color(0, 0, 1) 
+	return Color(0, 0, 1) 
+
+func _process(_delta):
+	var PlayerPos = Player.position
+	
+	update_minimap_position()
+	for room in Rooms:
+		var inner_rect = Rect2(room.rect.position + Vector2(16, 16), room.rect.size - Vector2(48, 48))
+		
+		if inner_rect.has_point(PlayerPos):
+			if room != CurrentRoom:
+				CurrentRoom = room
+				LockCurrentRoom()
+			
+			break
+"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_bpttf"]
+texture = ExtResource("3_ewluf")
+0:0/0 = 0
+0:0/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+0:0/0/physics_layer_0/angular_velocity = 0.0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+1:0/0 = 0
+1:0/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+1:0/0/physics_layer_0/angular_velocity = 0.0
+1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+2:0/0 = 0
+2:0/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+2:0/0/physics_layer_0/angular_velocity = 0.0
+2:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+0:1/0 = 0
+0:1/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+0:1/0/physics_layer_0/angular_velocity = 0.0
+0:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, -2.28571, -8, -2, 8, -8, 8)
+1:1/0 = 0
+1:1/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+1:1/0/physics_layer_0/angular_velocity = 0.0
+1:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, -2, -8, -2, 8, -8, 8)
+2:1/0 = 0
+2:1/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+2:1/0/physics_layer_0/angular_velocity = 0.0
+2:1/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, -2, -8, -2, 8, -8, 8)
+0:2/0 = 0
+0:2/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+0:2/0/physics_layer_0/angular_velocity = 0.0
+0:2/0/physics_layer_0/polygon_0/points = PackedVector2Array(2, -8, 8, -8, 8, 8, 2, 8)
+1:2/0 = 0
+1:2/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+1:2/0/physics_layer_0/angular_velocity = 0.0
+1:2/0/physics_layer_0/polygon_0/points = PackedVector2Array(2, -8, 8, -8, 8, 8, 2, 8)
+2:2/0 = 0
+2:2/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+2:2/0/physics_layer_0/angular_velocity = 0.0
+2:2/0/physics_layer_0/polygon_0/points = PackedVector2Array(2, -8, 8, -8, 8, 8, 2, 8)
+0:3/0 = 0
+0:3/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+0:3/0/physics_layer_0/angular_velocity = 0.0
+0:3/0/physics_layer_0/polygon_0/points = PackedVector2Array(-3, -8, 3, -8, 3, 8, -3, 8)
+1:3/0 = 0
+1:3/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+1:3/0/physics_layer_0/angular_velocity = 0.0
+1:3/0/physics_layer_0/polygon_0/points = PackedVector2Array(-3, -8, 3, -8, 3, 8, -3, 8)
+2:3/0 = 0
+2:3/0/physics_layer_0/linear_velocity = Vector2(0, 0)
+2:3/0/physics_layer_0/angular_velocity = 0.0
+2:3/0/physics_layer_0/polygon_0/points = PackedVector2Array(-3, -8, 3, -8, 3, 8, -3, 8)
+
+[sub_resource type="TileSet" id="TileSet_lg7q6"]
+physics_layer_0/collision_layer = 1
+physics_layer_0/collision_mask = 10
+sources/0 = SubResource("TileSetAtlasSource_bpttf")
+
+[node name="MainGame" type="Node2D"]
+script = SubResource("GDScript_suuod")
+
+[node name="Map" type="TileMap" parent="."]
+tile_set = ExtResource("1_nhfjb")
+format = 2
+layer_0/name = "Wall_and_Floors"
+layer_1/name = "Objects"
+layer_1/tile_data = PackedInt32Array()
+
+[node name="PeaksOrder" type="TileMap" parent="."]
+tile_set = ExtResource("2_flcyn")
+format = 2
+
+[node name="Doors" type="TileMap" parent="."]
+tile_set = SubResource("TileSet_lg7q6")
+format = 2
+
+[node name="Objects" type="Node2D" parent="."]
+
+[node name="Entities" type="Node2D" parent="."]
+y_sort_enabled = true
+position = Vector2(16, 11)
+
+[node name="Player" parent="Entities" instance=ExtResource("4_i4s86")]
+y_sort_enabled = true
+position = Vector2(45, 115)

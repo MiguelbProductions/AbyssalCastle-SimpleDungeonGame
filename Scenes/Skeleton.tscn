@@ -1,9 +1,0 @@
-[gd_scene format=3 uid="uid://cmoha1nhoy1dv"]
-
-[node name="Skeleton" type="CharacterBody2D"]
-
-[node name="Spr_Skeleton" type="Sprite2D" parent="."]
-
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]

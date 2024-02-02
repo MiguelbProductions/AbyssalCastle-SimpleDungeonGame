@@ -1,0 +1,168 @@
+[gd_scene load_steps=10 format=3 uid="uid://brl7g0b5yiyb5"]
+
+[ext_resource type="Texture2D" uid="uid://db8opa256ors0" path="res://Assets/Tileset/ShopBox.png" id="1_nwym1"]
+[ext_resource type="Texture2D" uid="uid://wodp3exyf74y" path="res://Assets/Items/flasks/flasks_1_1.png" id="2_ldbls"]
+[ext_resource type="FontFile" uid="uid://dfj2xjolnibo4" path="res://Assets/GUI/Font/5x5/cryos-font.ttf" id="3_ugihw"]
+
+[sub_resource type="GDScript" id="GDScript_py12v"]
+script/source = "extends StaticBody2D
+
+@onready var Animation_Items = $ItemContainer/Animation_Items
+@onready var QuestionDialog = $\"../../Entities/Player/GUI/ChatBox/QuestionDialog\"
+
+func _ready():
+	Animation_Items.play(\"Default\")
+
+func Player_On_Box(body):
+	if (body.is_in_group(\"Player\")): QuestionDialog.visible = true
+
+func Player_Out_Box(body):
+	if (body.is_in_group(\"Player\")): QuestionDialog.visible = false
+"
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_upb5a"]
+size = Vector2(16, 16)
+
+[sub_resource type="GDScript" id="GDScript_ger53"]
+script/source = "extends Control
+
+@onready var ItemIcon = $ItemIcon
+@onready var Price = $Price
+
+var Objects_Data = [
+	{
+		\"Name\": \"Health Potion\",
+		\"Texture\": preload(\"res://Assets/Items/flasks/flasks_1_1.png\"),
+		\"Price\": randi_range(6, 10),
+	},
+	{
+		\"Name\": \"Energy Potion\",
+		\"Texture\": preload(\"res://Assets/Items/flasks/flasks_2_1.png\"),
+		\"Price\": randi_range(6, 12),
+	},
+	{
+		\"Name\": \"Strength\",
+		\"Texture\": preload(\"res://Assets/Items/flasks/flasks_2_1.png\"),
+		\"Price\": randi_range(6, 12),
+	},
+]
+
+func _ready():
+	var SelectedObject = Objects_Data[randi_range(0, Objects_Data.size() - 1)]
+	
+	ItemIcon.texture = SelectedObject[\"Texture\"]
+	Price.text = str(SelectedObject[\"Price\"]) + \"$\"
+"
+
+[sub_resource type="Animation" id="Animation_eyug6"]
+resource_name = "Default"
+length = 1.6
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("ItemBox:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.4, 0.8, 1.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(0, -1), Vector2(0, 0), Vector2(0, 1)]
+}
+
+[sub_resource type="Animation" id="Animation_2gll5"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("ItemBox/ItemIcon:texture")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [ExtResource("2_ldbls")]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("ItemBox:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_q445j"]
+_data = {
+"Default": SubResource("Animation_eyug6"),
+"RESET": SubResource("Animation_2gll5")
+}
+
+[node name="ShopBox" type="StaticBody2D"]
+collision_layer = 0
+collision_mask = 0
+script = SubResource("GDScript_py12v")
+
+[node name="Spr_Ladders" type="Sprite2D" parent="."]
+texture = ExtResource("1_nwym1")
+
+[node name="Collision_Ladders" type="CollisionShape2D" parent="."]
+visible = false
+shape = SubResource("RectangleShape2D_upb5a")
+
+[node name="PlayerDetectArea" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 2
+
+[node name="AreaofDetection" type="CollisionShape2D" parent="PlayerDetectArea"]
+visible = false
+shape = SubResource("RectangleShape2D_upb5a")
+
+[node name="ItemContainer" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+
+[node name="ItemBox" type="Control" parent="ItemContainer"]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = SubResource("GDScript_ger53")
+
+[node name="ItemIcon" type="TextureRect" parent="ItemContainer/ItemBox"]
+layout_mode = 0
+offset_top = -9.81543
+offset_right = 40.0
+offset_bottom = 30.1846
+texture = ExtResource("2_ldbls")
+stretch_mode = 3
+
+[node name="Price" type="Label" parent="ItemContainer/ItemBox"]
+layout_mode = 0
+offset_left = 15.0
+offset_top = -2.27149
+offset_right = 84.0
+offset_bottom = 38.7285
+scale = Vector2(0.15, 0.15)
+theme_override_colors/font_color = Color(0.839216, 0.839216, 0.839216, 1)
+theme_override_fonts/font = ExtResource("3_ugihw")
+theme_override_font_sizes/font_size = 40
+text = "2$"
+vertical_alignment = 1
+
+[node name="Animation_Items" type="AnimationPlayer" parent="ItemContainer"]
+libraries = {
+"": SubResource("AnimationLibrary_q445j")
+}
+
+[connection signal="body_entered" from="PlayerDetectArea" to="." method="Player_On_Box"]
+[connection signal="body_exited" from="PlayerDetectArea" to="." method="Player_Out_Box"]

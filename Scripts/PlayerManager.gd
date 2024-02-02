@@ -1,11 +1,9 @@
 extends Node
 
+var MAXLIVES = 10
 
-# Called when the node enters the scene tree for the first time.
-func _ready():
-	pass # Replace with function body.
+var CurrentMaxLives = 5
+var Lives = 5
+var Shield = 1
 
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta):
-	pass
+var ChangingScenes = false

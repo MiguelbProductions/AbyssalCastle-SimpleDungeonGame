@@ -1,0 +1,271 @@
+[gd_scene load_steps=15 format=3 uid="uid://dbyxr65ca8b65"]
+
+[ext_resource type="Texture2D" uid="uid://bkw3076dn27dv" path="res://Assets/GUI/Bars/ColorBars/Empty_V2.png" id="1_vd5y0"]
+[ext_resource type="Texture2D" uid="uid://b6kkkfm7rpidl" path="res://Assets/GUI/Bars/ColorBars/Health.png" id="2_7l2cc"]
+[ext_resource type="Texture2D" uid="uid://rriyc4bfosxd" path="res://Assets/GUI/Bars/ColorBars/Shield.png" id="3_svd1u"]
+[ext_resource type="Texture2D" uid="uid://dtxygrm542glu" path="res://Assets/GUI/Bars/ColorBars/Energy.png" id="4_7rcbx"]
+[ext_resource type="Texture2D" uid="uid://c8052t6sp6hy6" path="res://Assets/GUI/Bars/Bars/DefaultBar.png" id="4_fjxcp"]
+[ext_resource type="FontFile" uid="uid://dt6mdwtn46ie4" path="res://Assets/GUI/Font/6x6/cryos-font.ttf" id="5_x4y05"]
+[ext_resource type="Texture2D" uid="uid://b0myp2nkg8t7g" path="res://Assets/GUI/GUI Inner/SimpleBorder.png" id="6_dls0f"]
+[ext_resource type="Texture2D" uid="uid://lu5kk4grv260" path="res://Assets/GUI/GUI Inner/ChatBox.png" id="7_jseat"]
+
+[sub_resource type="GDScript" id="GDScript_6xuor"]
+script/source = "extends Control
+
+@onready var HealthBar = $HealthBar
+@onready var ShielBar = $ShieldBar
+
+func UpdateHealth():
+	HealthBar.max_value = PlayerManager.CurrentMaxLives
+	HealthBar.value = PlayerManager.Lives
+	
+	ShielBar.max_value = PlayerManager.CurrentMaxLives
+	ShielBar.value = PlayerManager.Shield
+
+func _process(_delta):
+	UpdateHealth()
+"
+
+[sub_resource type="GDScript" id="GDScript_xwulh"]
+script/source = "extends Control
+
+@onready var FloorLevelTxt = $FloorLevel
+
+func _ready():
+	FloorLevelTxt.text = \"Floor \" + str(GameManager.FloorLevel)
+"
+
+[sub_resource type="Animation" id="Animation_waksf"]
+resource_name = "FadeIn"
+length = 0.5
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("CoverScene:color")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Color(0.00392157, 0.00392157, 0.00392157, 1), Color(0.00392157, 0.00392157, 0.00392157, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_fcu4q"]
+resource_name = "FadeOut"
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("CoverScene:color")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Color(0.00392157, 0.00392157, 0.00392157, 0), Color(0.00392157, 0.00392157, 0.00392157, 1)]
+}
+
+[sub_resource type="Animation" id="Animation_ofm85"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("CoverScene:color")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(0, 0, 0, 0)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_uxo5t"]
+_data = {
+"FadeIn": SubResource("Animation_waksf"),
+"FadeOut": SubResource("Animation_fcu4q"),
+"RESET": SubResource("Animation_ofm85")
+}
+
+[node name="GUI" type="CanvasLayer"]
+
+[node name="StatsBox" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 1280.0
+offset_bottom = 720.0
+script = SubResource("GDScript_6xuor")
+
+[node name="HealthBar" type="TextureProgressBar" parent="StatsBox"]
+layout_mode = 0
+offset_left = 35.3
+offset_top = 37.0
+offset_right = 131.0
+offset_bottom = 49.0
+max_value = 8.0
+value = 8.0
+nine_patch_stretch = true
+texture_under = ExtResource("1_vd5y0")
+texture_progress = ExtResource("2_7l2cc")
+
+[node name="ShieldBar" type="TextureProgressBar" parent="StatsBox"]
+offset_left = 35.3
+offset_top = 37.0
+offset_right = 131.0
+offset_bottom = 49.0
+max_value = 8.0
+value = 1.0
+nine_patch_stretch = true
+texture_progress = ExtResource("3_svd1u")
+
+[node name="LiveBox" type="TextureRect" parent="StatsBox"]
+layout_mode = 0
+offset_left = 23.0
+offset_top = 25.0
+offset_right = 143.0
+offset_bottom = 62.0
+texture = ExtResource("4_fjxcp")
+stretch_mode = 4
+
+[node name="EnergyBar" type="TextureProgressBar" parent="StatsBox"]
+layout_mode = 0
+offset_left = 33.0
+offset_top = 75.0
+offset_right = 113.0
+offset_bottom = 86.0
+max_value = 80.0
+value = 80.0
+nine_patch_stretch = true
+texture_under = ExtResource("1_vd5y0")
+texture_progress = ExtResource("4_7rcbx")
+
+[node name="EnergyBox" type="TextureRect" parent="StatsBox"]
+layout_mode = 0
+offset_left = 23.0
+offset_top = 65.0
+offset_right = 134.0
+offset_bottom = 96.0
+texture = ExtResource("4_fjxcp")
+stretch_mode = 4
+
+[node name="FloorInfo" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = SubResource("GDScript_xwulh")
+
+[node name="FloorLevel" type="Label" parent="FloorInfo"]
+layout_mode = 0
+offset_right = 1280.0
+offset_bottom = 61.0
+scale = Vector2(1.00069, 1)
+theme_override_colors/font_outline_color = Color(0.0745098, 0.0745098, 0.0745098, 1)
+theme_override_constants/outline_size = 17
+theme_override_fonts/font = ExtResource("5_x4y05")
+theme_override_font_sizes/font_size = 17
+text = "Floor 1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MapBox" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Background" type="ColorRect" parent="MapBox"]
+clip_children = 2
+layout_mode = 0
+offset_left = 1112.0
+offset_top = 38.0
+offset_right = 1236.0
+offset_bottom = 162.0
+color = Color(0.721569, 0.435294, 0.313726, 1)
+
+[node name="BorderMap" type="TextureRect" parent="MapBox"]
+layout_mode = 0
+offset_left = 1103.0
+offset_top = 29.0
+offset_right = 1246.0
+offset_bottom = 171.0
+texture = ExtResource("6_dls0f")
+stretch_mode = 4
+
+[node name="ChatBox" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_right = 1280.0
+offset_bottom = 720.0
+
+[node name="QuestionDialog" type="Control" parent="ChatBox"]
+visible = false
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="BG" type="TextureRect" parent="ChatBox/QuestionDialog"]
+layout_mode = 0
+offset_top = 568.0
+offset_right = 1280.0
+offset_bottom = 668.0
+texture = ExtResource("7_jseat")
+stretch_mode = 5
+
+[node name="Question" type="Label" parent="ChatBox/QuestionDialog"]
+layout_mode = 0
+offset_left = 260.0
+offset_top = 587.0
+offset_right = 727.0
+offset_bottom = 610.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 14
+theme_override_fonts/font = ExtResource("5_x4y05")
+theme_override_font_sizes/font_size = 15
+text = "Do you want to buy this item? (The Potion Bootle)
+"
+
+[node name="YesBtn" type="Button" parent="ChatBox/QuestionDialog"]
+modulate = Color(0, 0.878431, 0, 1)
+layout_mode = 0
+offset_left = 259.0
+offset_top = 620.0
+offset_right = 342.0
+offset_bottom = 653.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 16
+theme_override_fonts/font = ExtResource("5_x4y05")
+theme_override_font_sizes/font_size = 21
+text = "Yes"
+flat = true
+alignment = 0
+icon_alignment = 1
+
+[node name="NoBtn" type="Button" parent="ChatBox/QuestionDialog"]
+self_modulate = Color(1, 0.0392157, 0.0235294, 1)
+offset_left = 348.0
+offset_top = 620.0
+offset_right = 410.0
+offset_bottom = 653.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 16
+theme_override_fonts/font = ExtResource("5_x4y05")
+theme_override_font_sizes/font_size = 21
+text = "No"
+flat = true
+alignment = 0
+
+[node name="CoverScene" type="ColorRect" parent="."]
+visible = false
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0, 0, 0, 0)
+
+[node name="GUI_Animation" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_uxo5t")
+}

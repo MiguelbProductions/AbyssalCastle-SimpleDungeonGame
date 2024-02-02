@@ -1,0 +1,390 @@
+[gd_scene load_steps=21 format=3 uid="uid://cla80raxniq7c"]
+
+[ext_resource type="Texture2D" uid="uid://dmy6jmq46u2qx" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Idle/GoblinArcherIdle1.png" id="1_lmi80"]
+[ext_resource type="Texture2D" uid="uid://d0tqdnclcl2r" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Idle/GoblinArcherIdle1_V2.png" id="2_o1ajj"]
+[ext_resource type="Texture2D" uid="uid://bfmrgl1equirb" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Idle/GoblinArcherIdle2_V2.png" id="3_cwb8i"]
+[ext_resource type="Texture2D" uid="uid://h8k3jx71kijw" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Shoot/GoblinArcherShoot1.png" id="4_1k275"]
+[ext_resource type="Texture2D" uid="uid://da3dtey7el6lb" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Shoot/GoblinArcherShoot2.png" id="5_l835y"]
+[ext_resource type="Texture2D" uid="uid://mveq1lgmse8y" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Shoot/GoblinArcherShoot3.png" id="6_i2vgi"]
+[ext_resource type="Texture2D" uid="uid://474y0mlticvq" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Shoot/GoblinArcherShoot4.png" id="7_pteei"]
+[ext_resource type="Texture2D" uid="uid://ul7amjbb3q0" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Shoot/GoblinArcherShoot5.png" id="8_etd1l"]
+[ext_resource type="Texture2D" uid="uid://bfn4d362vorif" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Shoot/GoblinArcherShoot6.png" id="9_5l0an"]
+[ext_resource type="Texture2D" uid="uid://3l5k0bn8ojba" path="res://Assets/Entities/Humanoid/Animations/goblin archer/Shoot/GoblinArcherShoot7.png" id="10_tebro"]
+
+[sub_resource type="GDScript" id="GDScript_pa037"]
+script/source = "extends CharacterBody2D
+
+@onready var Animation_Goblin = $Animation_Goblin
+@onready var Spr_Goblin = $Spr_Goblin
+
+const EnemyArrowScene = preload(\"res://Scenes/Enemies/EnemyArrow.tscn\")
+
+const MOVE_SPEED = 50
+const ORBIT_SPEED = 1
+const ORBIT_CHANGE_INTERVAL_MIN = 1.0
+const ORBIT_CHANGE_INTERVAL_MAX = 3.0
+
+const ARROW_LAUNCH_INTERVAL_MIN = 2.0
+const ARROW_LAUNCH_INTERVAL_MAX = 5.0
+
+var OrbitDistance = 80
+var OrbitAngle = 0
+
+var NextDirection_ChangeTime = 0
+var OrbitDirection = 1
+
+var NextArrow_LaunchTime = 0
+
+var is_player_detected: bool = false
+var Player
+
+var Lives = 3
+var Hitting = false
+
+var RandomMoveDirection = Vector2.ZERO
+var NextRandomMoveChangeTime = 0
+
+var current_room
+
+signal enemie_defeated
+
+
+func Move(delta):
+	if is_player_detected:
+		if Time.get_ticks_msec() > NextDirection_ChangeTime:
+			OrbitDirection *= -1
+			NextDirection_ChangeTime = Time.get_ticks_msec() + randi_range(ORBIT_CHANGE_INTERVAL_MIN, ORBIT_CHANGE_INTERVAL_MAX) * 1000
+		
+		OrbitAngle += OrbitDirection * ORBIT_SPEED * delta + randi_range(-0.1, 0.1)
+		
+		var DistanceVariation = randf_range(-0.35, 0.35)
+		var _offset = Vector2(cos(OrbitAngle), sin(OrbitAngle)) * (OrbitDistance + DistanceVariation)
+		
+		var TargetPos = Player.get_node(\"PlayerPoint\").global_position + Vector2(cos(OrbitAngle), sin(OrbitAngle)) * (OrbitDistance + DistanceVariation)
+		
+		var move_direction = (TargetPos - position).normalized()
+		
+		velocity = move_direction * MOVE_SPEED
+		move_and_slide()
+	else:
+		if Time.get_ticks_msec() > NextRandomMoveChangeTime:
+			RandomMoveDirection = Vector2(randf() * 2.0 - 1.0, randf() * 2.0 - 1.0).normalized()
+			NextRandomMoveChangeTime = Time.get_ticks_msec() + randi_range(ORBIT_CHANGE_INTERVAL_MIN, ORBIT_CHANGE_INTERVAL_MAX) * 1000
+		
+		velocity = RandomMoveDirection * MOVE_SPEED
+		move_and_slide()
+		
+		if not (current_room.rect.encloses(Rect2(position - Vector2(8, 8), Vector2(16, 16)))):
+			RandomMoveDirection = -RandomMoveDirection
+			position.x = clamp(position.x, current_room.rect.position.x, current_room.rect.end.x)
+			position.y = clamp(position.y, current_room.rect.position.y, current_room.rect.end.y)
+		
+		if (get_slide_collision_count() > 0): 
+			RandomMoveDirection = Vector2(randf() * 2.0 - 1.0, randf() * 2.0 - 1.0).normalized()
+			NextRandomMoveChangeTime = Time.get_ticks_msec() + randi_range(ORBIT_CHANGE_INTERVAL_MIN, ORBIT_CHANGE_INTERVAL_MAX) * 1000
+
+func Animate():
+	if Player and is_player_detected:
+		Spr_Goblin.flip_h = position.x > Player.position.x
+	
+	if (is_player_detected):
+		Animation_Goblin.play(\"Walk\")
+	else:
+		Animation_Goblin.play(\"Idle\")
+
+func PlayerDetected(body):
+	if body.is_in_group(\"Player\"):
+		Player = body
+		
+		NextArrow_LaunchTime = Time.get_ticks_msec() + randi_range(ARROW_LAUNCH_INTERVAL_MIN, ARROW_LAUNCH_INTERVAL_MAX) * 1000
+		is_player_detected = true
+
+func PlayerUndetectable(body):
+	if body.is_in_group(\"Player\"):
+		is_player_detected = false
+
+func Attack():
+	if is_player_detected and Time.get_ticks_msec() > NextArrow_LaunchTime:
+		launch_arrow()
+		NextArrow_LaunchTime = Time.get_ticks_msec() + randi_range(ARROW_LAUNCH_INTERVAL_MIN, ARROW_LAUNCH_INTERVAL_MAX) * 1000
+
+func launch_arrow():
+	var arrow = EnemyArrowScene.instantiate()
+	
+	arrow.position = position
+	arrow.direction = (Player.position - position).normalized()
+	
+	get_parent().add_child(arrow)
+
+func Hit(Damage):
+	if (Hitting): return
+	
+	Hitting = true
+	Lives -= Damage
+	
+	if (Lives <= 0):
+		Animation_Goblin.play(\"Death\")
+		
+		await Animation_Goblin.animation_finished
+		
+		emit_signal(\"enemie_defeated\", current_room)
+		queue_free()
+	else:
+		Animation_Goblin.play(\"Hit\")
+		
+		await Animation_Goblin.animation_finished
+	
+	Hitting = false
+
+func _physics_process(delta):
+	if (!Hitting):
+		Animate()
+	
+	Move(delta)
+	Attack()
+"
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_vs4mt"]
+radius = 5.0
+
+[sub_resource type="Animation" id="Animation_o56xy"]
+resource_name = "Death"
+length = 0.3
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Spr_Goblin/ColorBox_Goblin:color")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.3),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Spr_Goblin:modulate")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.3),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Color(1, 1, 1, 1), Color(1, 1, 1, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_0b6l8"]
+resource_name = "Hit"
+length = 0.3
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Spr_Goblin/ColorBox_Goblin:color")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.3),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Color(1, 1, 1, 0), Color(1, 1, 1, 1), Color(1, 1, 1, 0)]
+}
+
+[sub_resource type="Animation" id="Animation_scc4i"]
+resource_name = "Idle"
+length = 3.0
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Spr_Goblin:texture")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1.5, 2.3),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 1,
+"values": [ExtResource("2_o1ajj"), ExtResource("3_cwb8i"), ExtResource("2_o1ajj")]
+}
+
+[sub_resource type="Animation" id="Animation_cwtof"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Spr_Goblin:texture")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [ExtResource("1_lmi80")]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Spr_Goblin:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0, 0)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Collision_Goblin:position")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(-2, 4)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("Spr_Goblin:scale")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(1, 1)]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("Spr_Goblin/ColorBox_Goblin:color")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(1, 1, 1, 0)]
+}
+tracks/5/type = "value"
+tracks/5/imported = false
+tracks/5/enabled = true
+tracks/5/path = NodePath("Spr_Goblin:modulate")
+tracks/5/interp = 1
+tracks/5/loop_wrap = true
+tracks/5/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Color(1, 1, 1, 1)]
+}
+
+[sub_resource type="Animation" id="Animation_myceg"]
+resource_name = "Shoot"
+length = 1.5
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Spr_Goblin:texture")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9, 1.2, 1.4, 1.5),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1),
+"update": 1,
+"values": [ExtResource("4_1k275"), ExtResource("5_l835y"), ExtResource("6_i2vgi"), ExtResource("7_pteei"), ExtResource("8_etd1l"), ExtResource("9_5l0an"), ExtResource("10_tebro")]
+}
+
+[sub_resource type="Animation" id="Animation_pcoq0"]
+resource_name = "Walk"
+length = 1.2
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Spr_Goblin:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(0, -1), Vector2(0, 0), Vector2(0, 1)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Collision_Goblin:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(-2, 4), Vector2(-2, 3), Vector2(-2, 4), Vector2(-2, 5)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Spr_Goblin:scale")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.3, 0.6, 0.9),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"update": 0,
+"values": [Vector2(1, 1), Vector2(0.95, 1.05), Vector2(1, 1), Vector2(1.05, 0.95)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_oijv6"]
+_data = {
+"Death": SubResource("Animation_o56xy"),
+"Hit": SubResource("Animation_0b6l8"),
+"Idle": SubResource("Animation_scc4i"),
+"RESET": SubResource("Animation_cwtof"),
+"Shoot": SubResource("Animation_myceg"),
+"Walk": SubResource("Animation_pcoq0")
+}
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_w2r88"]
+radius = 102.044
+
+[node name="GoblinArcher" type="CharacterBody2D" groups=["Enemies"]]
+y_sort_enabled = true
+collision_layer = 8
+script = SubResource("GDScript_pa037")
+
+[node name="Spr_Goblin" type="Sprite2D" parent="."]
+clip_children = 2
+texture = ExtResource("1_lmi80")
+
+[node name="ColorBox_Goblin" type="ColorRect" parent="Spr_Goblin"]
+offset_left = -8.0
+offset_top = -5.0
+offset_right = 7.0
+offset_bottom = 9.0
+color = Color(1, 1, 1, 0)
+
+[node name="Collision_Goblin" type="CollisionShape2D" parent="."]
+position = Vector2(-2, 4)
+shape = SubResource("CircleShape2D_vs4mt")
+
+[node name="Animation_Goblin" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_oijv6")
+}
+
+[node name="PlayerDetectArea" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 2
+
+[node name="AreaofDetection" type="CollisionShape2D" parent="PlayerDetectArea"]
+position = Vector2(-2, 3)
+shape = SubResource("CircleShape2D_w2r88")
+
+[connection signal="body_entered" from="PlayerDetectArea" to="." method="PlayerDetected"]
+[connection signal="body_exited" from="PlayerDetectArea" to="." method="PlayerUndetectable"]

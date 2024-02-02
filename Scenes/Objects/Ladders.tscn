@@ -1,0 +1,43 @@
+[gd_scene load_steps=4 format=3 uid="uid://d2fd2313045ve"]
+
+[ext_resource type="Texture2D" uid="uid://b35ceyk7an6ii" path="res://Assets/Tileset/Ladders.png" id="1_abv8x"]
+
+[sub_resource type="GDScript" id="GDScript_bxsud"]
+script/source = "extends StaticBody2D
+
+func PlayerDetected(body):
+	if (body.is_in_group(\"Player\")): 
+		PlayerManager.ChangingScenes = true
+		
+		GameManager.FloorLevel += 1
+		
+		var GUI_Animation = get_node(\"../../Entities/Player/GUI/GUI_Animation\")
+		
+		GUI_Animation.play(\"FadeOut\")
+		await GUI_Animation.animation_finished
+		
+		get_tree().reload_current_scene()
+
+"
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_upb5a"]
+size = Vector2(16, 16)
+
+[node name="Ladders" type="StaticBody2D"]
+script = SubResource("GDScript_bxsud")
+
+[node name="Spr_Ladders" type="Sprite2D" parent="."]
+texture = ExtResource("1_abv8x")
+
+[node name="Collision_Ladders" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_upb5a")
+disabled = true
+
+[node name="PlayerDetectArea" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 2
+
+[node name="AreaofDetection" type="CollisionShape2D" parent="PlayerDetectArea"]
+shape = SubResource("RectangleShape2D_upb5a")
+
+[connection signal="body_entered" from="PlayerDetectArea" to="." method="PlayerDetected"]
